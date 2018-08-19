@@ -100,7 +100,7 @@
           <v-slide-x-reverse-transition>
             <v-flex v-show="main_page_shown" xs12 sm6 pr-1 class="text-xs-center" style="height: 100%">
               <v-card style="position: relative; height: 100%; border-radius: 5px; background-color:rgba(255, 255, 255, 0.3);">
-                <textarea v-model="text"
+                <textarea v-model="text" :disabled="show_batch_progress"
                   style="border: none; overflow: auto; outline: none; -webkit-box-shadow: none; -moz-box-shadow: none; box-shadow: none;
                     color: #ffffff; resize: none; padding: 25px; width:100%; height:100%; box-sizing: border-box; -moz-box-sizing: border-box;
                     -webkit-box-sizing: border-box;"
@@ -112,53 +112,80 @@
           <v-slide-x-transition>
             <v-flex v-show="main_page_shown" xs12 sm6 pl-1 class="text-xs-center" style="height: 100%">
               <v-card style="position: relative; height: 100%; border-radius: 5px;">
-                <v-btn
-                  depressed
-                  block
-                  :loading="loading_train"
-                  :disabled="loading_train"
-                  color="light-blue"
-                  class="mt-0 mb-0 white--text"
-                  style="border-radius: 5px 5px 0px 0px; text-transform: lowercase;"
-                  @click.native="loader = 'loading_train'"
-                >
-                  ok, let's start learning
-                  <span slot="loader" class="custom-loader">
-                    <v-icon light>cached</v-icon>
-                  </span>
-                </v-btn>
-                <!--<v-btn
-                  flat
-                  depressed
-                  block
-                  :loading="loading_save"
-                  :disabled="loading_save"
-                  color="light-blue"
-                  class="mt-0 mb-0 white--text"
-                  style="border-radius: 0px; text-transform: lowercase;"
-                  @click.native="loader = 'loading_save'"
-                >
-                  save model
-                  <span slot="loader" class="custom-loader">
-                    <v-icon light>save</v-icon>
-                  </span>
-                </v-btn>
-                <v-btn
-                  flat
-                  depressed
-                  block
-                  :loading="loading_load"
-                  :disabled="loading_load"
-                  color="light-blue"
-                  class="mt-0 mb-0 white--text"
-                  style="border-radius: 0px; text-transform: lowercase;"
-                  @click.native="loader = 'loading_load'"
-                >
-                  load existing model
-                  <span slot="loader" class="custom-loader">
-                    <v-icon light>save_alt</v-icon>
-                  </span>
-                </v-btn>-->
+                <v-fade-transition>
+                  <div fill-height v-show="show_batch_progress" style="height: 100%; display: flex; flex-direction: column;">
+                    <v-progress-linear
+                      class="mt-0 mb-0"
+                      v-model="batch_progress">
+                    </v-progress-linear>
+
+                    <div v-show="!start_training" align-center class="pa-3">
+                      <v-btn @click="train_model()" style="background-color: #FF00EA" fab depressed large dark>
+                        <v-icon>play_arrow</v-icon>
+                      </v-btn>
+                      <p class="headline mb-1">start learning</p>
+                      <p>hey, don't be alarmed but this tab will probably <i>freeze up</i> a bit while the AI learns.</p>
+                      <p>by default it will run 10 iterations. depending on the size of your input text and your computer speed this could take anywhere from <i>5 minutes</i> to <i>several hours</i></p>
+                      <p>if it's taking too long just close this tab and come back to edit the settings below</p>
+                      <v-expansion-panel popout>
+                        <v-expansion-panel-content style="border-radius: 5px;">
+                          <div slot="header">advanced settings</div>
+                          <v-card class="pa-2 mt-3">
+                            <v-slider
+                              thumb-label="always"
+                              v-model="iterations_length"
+                              label="iterations"
+                            ></v-slider>
+                            <v-switch class="ma-0"
+                              label="show log"
+                              v-model="show_log"
+                              color="info"
+                            ></v-switch>
+                          </v-card>
+                        </v-expansion-panel-content>
+                      </v-expansion-panel>
+                    </div>
+                    <div class="pa-3">
+                      <v-btn
+                        v-show="start_training && !finished_training"
+                        loading
+                        color="black"
+                        flat
+                        @click.native="loader = 'loading4'"
+                      >
+                        <span slot="loader" class="custom-loader">
+                          <v-icon color="black">cached</v-icon>
+                        </span>
+                      </v-btn>
+                      <p v-show="start_training" v-html="status"></p>
+                      <p v-if="(status_last_predicted_sentence != '') && (show_log == false)"><b>example from most recent iteration:</b> {{status_last_predicted_sentence}}</p>
+                    </div>
+                    <textarea v-show="start_training && show_log" disabled id="output_log"
+                      style="border: none; overflow: auto; outline: none; -webkit-box-shadow: none; -moz-box-shadow: none; box-shadow: none;
+                        color: #ffffff; background-color: #000000; resize: none; padding: 25px; width:100%; height:100%; box-sizing: border-box; -moz-box-sizing: border-box;
+                        -webkit-box-sizing: border-box;"
+                      v-model="output_log"
+                    ></textarea>
+                  </div>
+                </v-fade-transition>
+                <v-fade-transition>
+                  <v-btn
+                    v-show="model == null"
+                    depressed
+                    block
+                    :loading="loading_train"
+                    :disabled="loading_train"
+                    color="light-blue"
+                    class="mt-0 mb-0 white--text"
+                    style="border-radius: 5px 5px 0px 0px; text-transform: lowercase;"
+                    @click.native="loading_train = true"
+                  >
+                    ok, ready
+                    <span slot="loader" class="custom-loader">
+                      <v-icon light>cached</v-icon>
+                    </span>
+                  </v-btn>
+                </v-fade-transition>
               </v-card>
             </v-flex>
           </v-slide-x-transition>
@@ -177,11 +204,26 @@
       data: {
         front_page_shown: true,
         main_page_shown: false,
-        loader: null,
-        loading_save: false,
-        loading_load: false,
         loading_train: false,
-        text: "JERRY: pointing at georges shirt see to me that button is in the worst possible spot the second button literally makes or breaks the shirt look at it its too high its in nomansland you look like you live with your mother <newline> GEORGE: are you through  <newline> JERRY: you do of course try on when you buy <newline> GEORGE: yes it was purple i liked it i dont actually recall considering the buttons <newline> JERRY: oh you dont recall <newline> GEORGE: on an imaginary microphone uh no not at this time <newline> JERRY: well senator id just like to know what you knew and when you knew it <newline> CLAIRE: mr seinfeld mr costanza  <newline> GEORGE: are are you sure this is decaf wheres the orange indicator <newline> CLAIRE: its missing i have to do it in my head decaf left regular right decaf left regular rightits very challenging work <newline> JERRY: can you relax its a cup of coffee claire is a professional waitress <newline> CLAIRE: trust me george no one has any interest in seeing you on caffeine <newline> GEORGE: how come youre not doin the second show tomorrow <newline> JERRY: well theres this uh woman might be comin in <newline> GEORGE: wait a second wait a second what coming in what woman is coming in <newline> JERRY: i told you about laura the girl i met in michigan <newline> GEORGE: no you didnt <newline> JERRY: i thought i told you about it yes she teaches political science i met her the night i did the show in lansing  <newline> GEORGE: ha <newline> JERRY: looks in the creamer theres no milk in here what <newline> GEORGE: wait wait wait what is she takes the milk can from jerry and puts it on the table what is she like <newline> JERRY: oh shes really great i mean shes got like a real warmth about her and shes really bright and really pretty and uh the conversation though i mean it was talking with her is like talking with you but you know obviously much better <newline> GEORGE: smiling so you know what what happened <newline> JERRY: oh nothing happened you know but is was great <newline> GEORGE: oh nothing happened but it was <newline> JERRY: yeah <newline> GEORGE: this is great <newline> JERRY: yeah <newline> GEORGE: so you know she calls and says she wants to go out with you tomorrow night god bless devil you <newline> JERRY: yeah wellnot exactly i mean she said you know she called this morning and said she had to come in for a seminar and maybe well get together  <newline> GEORGE: whistles disapprovingly ho ho ho had to had to come in <newline> JERRY: yeah but <newline> GEORGE: had to come in and maybe well get together had to and maybe <newline> JERRY: yeah <newline> GEORGE: nonono i hate to tell you this youre not gonna see this woman <newline> JERRY: what are you seriouswhy why did she call <newline> GEORGE: how do i know maybe you know maybe she wanted to be polite  <newline> JERRY: to be polite you are insane <newline> GEORGE: all right all right i didnt want to tell you this you wanna know why she called you <newline> JERRY: yes <newline> GEORGE: youre a backup youre a secondline a justincase a bplan a contingency <newline> JERRY: oh i get it this is about the button <newline> GEORGE: claire claire youre a woman right <newline> CLAIRE: what gave it away george <newline> GEORGE: uhmid like to ask youask you to analyze a hypothetical phone call you know from a female point of view <newline> GEORGE: to claire now a woman calls me all right  <newline> CLAIE: uh huh <newline> GEORGE: she says she has to come to new york on business <newline> JERRY: oh you are beautiful <newline> GEORGE: and and maybe shell see me when she gets there does this woman intend to spend time with me <newline> CLAIRE: id have to say uuhh no  <newline> CLAIRE: to be polite <newline> GEORGE: to be polite i rest my case <newline> JERRY: good did you have fun you have no idea what youre talking about now come on come with me stands up i gotta go get my stuff out of the dryer anyway <newline> GEORGE: im not gonna watch you do laundry <newline> JERRY: oh come on be a comewith guy <newline> GEORGE: come on im tired <newline> CLAIRE: to jerry dont worry i gave him a little caffeine hell perk up <newline> GEORGE: panicking right i knew i felt something <newline> GEORGE: jerry i have to tell you something this is the dullest moment ive ever experienced  <newline> JERRY: well look at this guy look hes got everything hes got detergents sprays fabric softeners this is not his first load <newline> GEORGE: i need a break jerry you know i gotta get out of the city i feel so cramped <newline> JERRY: and you didnt even hear how she sounded <newline> GEORGE: what <newline> JERRY: laura <newline> GEORGE: i cant believe falls on his knees we already discussed this <newline> JERRY: yeah but how could you be so sure <newline> GEORGE: cause its signals jerry its signals snapping his fingers dont you all right did she even ask you what you were doin tomorrow night if you were busy <newline> JERRY: no <newline> GEORGE: she calls you today and she doesnt make a plan for tomorrow what is that its saturday night <newline> JERRY: yeah <newline> GEORGE: what is that its ridiculous you dont even know what hotel shes staying at you cant call her thats a signal jerry thats a signal snaps his fingers signal <newline> JERRY: maybe youre right <newline> GEORGE: maybe im right of course im right <newline> JERRY: this is insane you know i dont even know where shes staying she shes not gonna call me this is unbelievable <newline>"
+        text: null,
+        model: null,
+        batch_progress: 0,
+        maxlen: 30,
+        step: 3,
+        iterations_length: 10,
+        start_learning: false,
+        show_batch_progress: false,
+        word_indices: null,
+        indices_word: null,
+        X: null,
+        y: null,
+        list_words: null,
+        start_training: false,
+        finished_training: false,
+        output_log: null,
+        show_log: false,
+        status: '',
+        status_last_predicted_sentence: ''
       },
       methods: {
         clicked_pretrained: async function(id) {
@@ -220,8 +262,174 @@
           arr = preds.tolist()
           return this.indexOfMax(arr)
         },
-        ok: async function() {
+        create_model: function() {
+          console.log('corpus length:', this.text.length)
+          this.words = this.text.split(" ")
+          console.log("init " + this.words)
+          this.words = this.words.filter(this.onlyUnique)
+          console.log("unique" + this.words)
+          this.words = this.words.sort()
+          console.log("sorted" + this.words)
 
+          console.log("total number of unique words" + this.words.length)
+
+          this.word_indices = {}
+          this.indices_word = {}
+          for (let e0 of this.words.entries()) {
+            var idx = e0[0]
+            var word = e0[1]
+            this.word_indices[word] = idx
+            this.indices_word[idx] = word
+          }
+          console.log("WORD_INDICES" + JSON.stringify(this.word_indices))
+          console.log("INDICES_WORD" + JSON.stringify(this.indices_word))
+
+          console.log("word_indices length:" + this.word_indices.length)
+          console.log("indices_words length" + this.indices_word.length)
+
+          console.log("maxlen: " + this.maxlen, " step: " + this.step)
+
+          var sentences = []
+          var sentences1 = []
+
+          var next_words = []
+          this.list_words = this.text.toLowerCase().split(" ")
+
+          for (var i = 0; i < (this.list_words.length - this.maxlen); i += this.step) {
+            var sentences2 = this.list_words.slice(i, i + this.maxlen + 1).join(" ") //TODO added + 1, mutually inclusive?
+            sentences.push(sentences2)
+            next_words.push(this.list_words[i + this.maxlen])
+          }
+          console.log('nb sequences(length of sentences):', sentences.length)
+          console.log("length of next_word", next_words.length)
+
+          console.log('Vectorization...')
+          this.X = nj.zeros([sentences.length, this.maxlen, this.words.length])
+          console.log('X shape' + this.X.shape)
+          this.y = nj.zeros([sentences.length, this.words.length])
+          console.log('y shape' + this.y.shape)
+          for (e of sentences.entries()) {
+            var i = e[0]
+            var sentence = e[1]
+            for (e2 of sentence.split(" ").entries()) {
+              var t = e2[0]
+              var word = e2[1]
+              this.X.set(i, t, this.word_indices[word], 1)
+            }
+            this.y.set(i, this.word_indices[next_words[i]], 1)
+          }
+          //console.log(JSON.stringify(this.X))
+          //console.log(JSON.stringify(this.y))
+
+          console.log('Creating model... Please wait.');
+
+          this.model = tf.sequential();
+          this.model.add(tf.layers.lstm({
+            units: 128,
+            returnSequences: true,
+            inputShape: [this.maxlen, this.words.length]
+          }));
+          this.model.add(tf.layers.dropout(0.2))
+          this.model.add(tf.layers.lstm({
+            units: 128,
+            returnSequences: false
+          }));
+          this.model.add(tf.layers.dropout(0.2))
+          this.model.add(tf.layers.dense({units: this.words.length, activation: 'softmax'}));
+
+          this.model.compile({loss: 'categoricalCrossentropy', optimizer: 'sgd'});
+          this.start_learning = true
+          //this.loading_train = false
+        },
+        train_model: async function() {
+          var textarea = document.getElementById('output_log');
+          this.start_training = true
+          this.output_log = "training for " + this.iterations_length + " iterations\n"
+          await this.delay(1000);
+          for (var iteration = 1; iteration < this.iterations_length; iteration++) {
+            console.log('Iteration', iteration)
+            var vm = this
+            var batch_count = 0
+            await this.model.fit(tf.tensor3d(this.X.tolist()), tf.tensor2d(this.y.tolist()), {
+              epochs: 1,
+              batchSize: 128,
+              callbacks: {
+                onTrainBegin: async () => {
+                  vm.status = "<b>iteration " + iteration + "</b> starting..."
+                  await this.delay(300);
+                  console.log("onTrainBegin")
+                },
+                onTrainEnd: async (epoch, logs) => {
+                  console.log("onTrainEnd" + epoch + JSON.stringify(logs))
+                },
+                onEpochBegin: async (epoch, logs) => {
+                  this.output_log += "iteration " + iteration + " \n-----------------\nstarting...\n"
+                  console.log("onEpochBegin" + epoch + JSON.stringify(logs))
+                },
+                onEpochEnd: async (epoch, logs) => {
+                  vm.status = "<i> finished iteration " + iteration + "</i>"
+                  await this.delay(600);
+                  this.output_log += "finished... (loss " + logs.loss + ")\n"
+                  console.log("onEpochEnd" + epoch + JSON.stringify(logs))
+                },
+                onBatchBegin: async (epoch, logs) => {
+                  vm.status = "<b>iteration " + iteration + ":</b> starting batch " + ++batch_count
+                  await this.delay(300);
+                  console.log("onBatchBegin" + epoch + JSON.stringify(logs))
+                },
+                onBatchEnd: async (epoch, logs) => {
+                  vm.status = "<b>iteration " + iteration + ":</b> finished batch " + batch_count + " of size " + logs.size
+                  await this.delay(600);
+                  console.log("onBatchEnd" + epoch + JSON.stringify(logs))
+                }
+              }
+            })
+            this.batch_progress = (iteration/this.iterations_length)*100
+            console.log("done fitting " + this.batch_progress + " (" + iteration + "/" + this.iterations_length + ")*100")
+            await this.delay(300);
+            var start_index = Math.floor(Math.random() * (this.list_words.length - this.maxlen - 1))
+            this.output_log += "examples:\n"
+            var arr = [0.5]//[0.2, 0.5, 1.0, 1.2]
+            for (let diversity of arr) {
+              console.log('----- diversity:', diversity)
+              var generated = ''
+              var sentence = this.list_words.slice(start_index, start_index + this.maxlen + 1)
+              generated += sentence.join(" ")
+              console.log(generated)
+              var str = ""
+              for (var i = 0; i < 100; i++) {
+                var x_pred = nj.zeros([1, this.maxlen, this.words.length])
+                for (e3 of sentence.entries()) {
+                  t = e3[0]
+                  word = e3[1]
+                  x_pred.set(0, t, this.word_indices[word], 1)
+                }
+                var x_pred2 = x_pred.tolist()
+                var test = tf.tensor3d(x_pred2)
+                const output = this.model.predict(test)//await model.predict(inputData)
+                var output_data = await output.dataSync()
+                var preds = Array.prototype.slice.call(output_data);
+                var next_index = this.sample(preds, diversity)
+                //console.log('next_index' + next_index + " :: " + this.indices_word[next_index])
+                var next_word = this.indices_word[next_index]
+                generated += " " + next_word
+                sentence.shift()
+                str += next_word + " "
+                //console.log(str)
+              }
+              this.output_log += "diversity " + diversity + ": \n" + str + "\n"
+              this.status_last_predicted_sentence = str
+              textarea.scrollTop = textarea.scrollHeight;
+            }
+          }
+          this.batch_progress = 100
+          this.status = "( ◉◞౪◟◉) <i> done! </i>"
+          this.finished_training = true
+          console.log(
+              'Done creating model. ' +
+              'Now you can train the model or use it to generate text.');
+        }/*,
+        ok: async function() {
           console.log('corpus length:', this.text.length)
           words = this.text.split(" ")
           console.log("init " + words)
@@ -232,11 +440,6 @@
 
           console.log("total number of unique words" + words.length)
 
-          /*word_indices_arr = Array.from(words.entries())
-          indices_word_arr = []
-          for(let arr of word_indices_arr) {
-            indices_word_arr.push(arr.reverse())
-          }*/
           word_indices = {}
           indices_word = {}
           for (let e0 of words.entries()) {
@@ -331,11 +534,7 @@
                   console.log("onBatchEnd" + epoch + JSON.stringify(logs))
                 }
               }
-            })/*.then(results => {
-              console.log('ok')
-              console.log(results)
-            })*/
-            //await model.fit(tf.tensor3d(X.tolist()), tf.tensor2d(y.tolist()), {epochs: 2, batchSize: 128})
+            })
             console.log("done fitting")
             start_index = Math.floor(Math.random() * (list_words.length - maxlen - 1))
             arr = [0.2, 0.5, 1.0, 1.2]
@@ -362,9 +561,7 @@
                 console.log('next_index' + next_index + " :: " + indices_word[next_index])
                 var next_word = indices_word[next_index]
                 generated += next_word
-                //console.log("sentence " + sentence)
                 sentence.shift()
-                //console.log(sentence)
                 str += next_word + " "
                 console.log(str)
               }
@@ -373,16 +570,20 @@
           console.log(
               'Done creating model. ' +
               'Now you can train the model or use it to generate text.');
-          }
+          }*/
       },
       watch: {
-        loader () {
-          const l = this.loader
-          this[l] = !this[l]
-
-          setTimeout(() => (this[l] = false), 3000)
-
-          this.loader = null
+        start_learning: async function() {
+          if (this.start_learning == true) {
+            await this.delay(300);
+            this.show_batch_progress = true
+            //this.train_model()
+          }
+        },
+        loading_train: function() {
+          if (this.model == null) {
+            setTimeout(() => (this.create_model()), 1000)
+          }
         },
         text: async function() {
           this.front_page_shown = false
